@@ -11,6 +11,10 @@ class Document:
     @property
     def pages(self) -> list[Page]:
         return self._pages
+    
+    @property
+    def filetype(self) -> str:
+        return self.path.suffix
 
 @dataclass
 class Page:

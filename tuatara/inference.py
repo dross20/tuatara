@@ -2,7 +2,7 @@ from abc import ABC, abstractmethod
 
 class Inference(ABC):
     @abstractmethod
-    def generate(self, model: str, prompt: str) > str:
+    def generate(self, model: str, prompt: str) -> str:
         ...
 
 class OpenAIInference(Inference):
