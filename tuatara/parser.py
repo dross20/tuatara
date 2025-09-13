@@ -37,7 +37,7 @@ class FileParser(PipelineStep):
                     f"Supported file types: {supported_filetypes}"
                 )
             else:
-                parsed_results.extend(parser()(doc.path))
+                parsed_results.extend(parser()(doc))
         return parsed_results
 
 
@@ -50,7 +50,7 @@ class TXTParser(PipelineStep):
         texts = []
         for doc in docs:
             with open(doc.path, "r") as file:
-                texts.append(ParsedResult(file.read(), doc, 1))
+                texts.append(ParsedResult(file.read(), doc, 0))
         return texts
         
 
@@ -62,7 +62,7 @@ class PDFParser(PipelineStep):
     
     def forward(self, docs: Document | list[Document]):
         if not isinstance(docs, list):
-            docs = list[docs]
+            docs = [docs]
 
         texts = []
         for doc in docs:
