@@ -1,6 +1,21 @@
 from pipeline import PipelineStep
+from document import Document, Page
+from abc import abstractmethod
 
-class TokenChunker(PipelineStep):
+class Chunker(PipelineStep):
+    def forward(self, data: Document | list[Document]) -> list[Document]:
+        if not isinstance(data, list):
+            data = [data]
+        for doc in data:
+            for page in doc.pages:
+                page.chunks = self.chunk(page.text)
+        return data
+
+    @abstractmethod
+    def chunk(self, text: str) -> list[str]:
+        ...
+
+class TokenChunker(Chunker):
     """Chunker that splits on a token basis."""
     def __init__(
         self, chunk_size: int, overlap: int = 0, encoding_name: str = "cl100k_base"
@@ -17,16 +32,16 @@ class TokenChunker(PipelineStep):
         self.overlap = overlap
         self.encoding_name = encoding_name
 
-    def forward(self, data):
+    def chunk(self, text: str) -> list[str]:
         encoding = self.tiktoken.get_encoding(self.encoding_name)
-        tokens = encoding.encode(data, disallowed_special=())
+        tokens = encoding.encode(text, disallowed_special=())
         chunks = [
             encoding.decode(tokens[i:i + self.chunk_size])
             for i in range(0, len(tokens), self.chunk_size - self.overlap)
         ]
         return chunks
     
-class SentenceChunker(PipelineStep):
+class SentenceChunker(Chunker):
     """Chunker that splits on a sentence basis."""
     def __init__(
         self, chunk_size: int, overlap: int = 0, model: str = "punkt_tab"
@@ -43,15 +58,15 @@ class SentenceChunker(PipelineStep):
         self.chunk_size = chunk_size
         self.overlap = overlap
 
-    def forward(self, data):
-        sentences = self.nltk.tokenize.sent_tokenize(data)
+    def chunk(self, text: str) -> list[str]:
+        sentences = self.nltk.tokenize.sent_tokenize(text)
         chunks = [
             ' '.join(sentences[i:i + self.chunk_size])
             for i in range(0, len(sentences), self.chunk_size - self.overlap)
         ]
         return chunks
     
-class SemanticChunker(PipelineStep):
+class SemanticChunker(Chunker):
     """Chunker that splits on the semantic similarity of consecutive sentences."""
     def __init__(
         self,
@@ -93,8 +108,8 @@ class SemanticChunker(PipelineStep):
         return chunks
         
 
-    def forward(self, data):
-        sentences = self.nltk.tokenize.sent_tokenize(data)
+    def chunk(self, text: str) -> list[str]:
+        sentences = self.nltk.tokenize.sent_tokenize(text)
         embeddings = self.model.encode(sentences)
         chunks = self._create_chunks(sentences, embeddings)
         return chunks

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 class Document:
     def __init__(self, path: str | Path):
@@ -19,3 +19,4 @@ class Document:
 class Page:
     number: int
     text: str
+    chunks: list[str] = field(default_factory=list)

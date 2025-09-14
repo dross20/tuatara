@@ -1,8 +1,9 @@
 from pipeline import PipelineStep
 from pathlib import Path
 from dataclasses import dataclass
-from document import Document
+from document import Document, Page
 import warnings
+from abc import ABC, abstractmethod
 
 @dataclass
 class ParsedResult():
@@ -21,11 +22,12 @@ class FileParser(PipelineStep):
             return target
         return decorator
     
-    def forward(self, docs: Document | list[Document]):
+    def forward(self, docs: str | Path | Document | list[Document]):
         if not isinstance(docs, list):
             docs = [docs]
+        docs = [Document(doc) if not isinstance(doc, Document) else doc for doc in docs]
 
-        parsed_results = []
+        out_docs = []
 
         for doc in docs:
             parser = self._registry.get(doc.filetype)
@@ -37,35 +39,38 @@ class FileParser(PipelineStep):
                     f"Supported file types: {supported_filetypes}"
                 )
             else:
-                parsed_results.extend(parser()(doc))
-        return parsed_results
+                out_docs.extend(parser().forward(doc))
+        return out_docs
 
+class Parser(PipelineStep):
+    def forward(self, data: str | Path | Document | list[Document]) -> list[Document]:
+        if not isinstance(data, list):
+            data = [data]
+        data = [Document(doc) if not isinstance(doc, Document) else doc for doc in data]
+        parsed_docs = [self.parse(doc.path) for doc in data]
+        for doc, parsed_doc in zip(data, parsed_docs):
+            for idx, page in enumerate(parsed_doc):
+                doc.pages.append(Page(number=idx, text=page))
+        return data
+
+    @abstractmethod
+    def parse(self, path: Path) -> list[str]:
+        ...
 
 @FileParser.register_parser(".txt")
-class TXTParser(PipelineStep):
-    def forward(self, docs: Document | list[Document]):
-        if not isinstance(docs, list):
-            docs = [docs]
-
-        texts = []
-        for doc in docs:
-            with open(doc.path, "r") as file:
-                texts.append(ParsedResult(file.read(), doc, 0))
-        return texts
-        
+class TXTParser(Parser):
+    def parse(self, path: Path) -> list[str]:
+        with open(path, "r") as file:
+            return [file.read()] 
 
 @FileParser.register_parser(".pdf")
-class PDFParser(PipelineStep):
+class PDFParser(Parser):
     def __init__(self):
         import pdfplumber
-        self.ocr = pdfplumber
+        self.pdfplumber = pdfplumber
     
-    def forward(self, docs: Document | list[Document]):
-        if not isinstance(docs, list):
-            docs = [docs]
-
-        texts = []
-        for doc in docs:
-            with self.ocr.open(doc.path) as pdf:
-                texts.extend([ParsedResult(page.extract_text(), doc, i) for i, page in enumerate(pdf.pages)])
-        return texts
+    def parse(self, path: Path) -> list[str]:
+        pages = []
+        with self.pdfplumber.open(path) as pdf:
+            pages = [page.extract_text() for page in pdf.pages]
+        return pages
