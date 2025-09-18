@@ -1,3 +1,5 @@
+"""Contains definitions for objects that can be include in a pipeline."""
+
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
@@ -23,8 +25,8 @@ class Pipeable(ABC):
             return Pipeline([self]) | value
         else:
             raise TypeError(
-                "Instances of `Pipeable` cannot be piped with objects that don't "
-                "implement `Pipeable`"
+                "Instances of `Pipeable` can only be piped with other instances of "
+                "`Pipeable`."
             )
 
 

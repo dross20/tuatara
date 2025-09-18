@@ -1,3 +1,5 @@
+"""Contains all classes related to LLM inference."""
+
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import Any

@@ -1,3 +1,5 @@
+"""Contains all classes related to chunking."""
+
 from abc import abstractmethod
 
 from tuatara.document import Document

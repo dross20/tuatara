@@ -1,3 +1,5 @@
+"""Contains all classes related to documents, pages, and chunks."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field
