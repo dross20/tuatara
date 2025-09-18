@@ -1,6 +1,8 @@
-from tuatara.pipeline import PipelineStep
-from tuatara.document import Document, Page
 from abc import abstractmethod
+
+from tuatara.document import Document
+from tuatara.pipeline import PipelineStep
+
 
 class Chunker(PipelineStep):
     def forward(self, data: Document | list[Document]) -> list[Document]:
@@ -12,16 +14,18 @@ class Chunker(PipelineStep):
         return data
 
     @abstractmethod
-    def chunk(self, text: str) -> list[str]:
-        ...
+    def chunk(self, text: str) -> list[str]: ...
+
 
 class TokenChunker(Chunker):
     """Chunker that splits on a token basis."""
+
     def __init__(
         self, chunk_size: int, overlap: int = 0, encoding_name: str = "cl100k_base"
     ):
         try:
             import tiktoken
+
             self.tiktoken = tiktoken
         except ImportError:
             raise ImportError(
@@ -36,18 +40,19 @@ class TokenChunker(Chunker):
         encoding = self.tiktoken.get_encoding(self.encoding_name)
         tokens = encoding.encode(text, disallowed_special=())
         chunks = [
-            encoding.decode(tokens[i:i + self.chunk_size])
+            encoding.decode(tokens[i : i + self.chunk_size])
             for i in range(0, len(tokens), self.chunk_size - self.overlap)
         ]
         return chunks
-    
+
+
 class SentenceChunker(Chunker):
     """Chunker that splits on a sentence basis."""
-    def __init__(
-        self, chunk_size: int, overlap: int = 0, model: str = "punkt_tab"
-    ):
+
+    def __init__(self, chunk_size: int, overlap: int = 0, model: str = "punkt_tab"):
         try:
             import nltk
+
             self.nltk = nltk
             self.nltk.download(model, quiet=True)
         except ImportError:
@@ -61,30 +66,32 @@ class SentenceChunker(Chunker):
     def chunk(self, text: str) -> list[str]:
         sentences = self.nltk.tokenize.sent_tokenize(text)
         chunks = [
-            ' '.join(sentences[i:i + self.chunk_size])
+            " ".join(sentences[i : i + self.chunk_size])
             for i in range(0, len(sentences), self.chunk_size - self.overlap)
         ]
         return chunks
-    
+
+
 class SemanticChunker(Chunker):
     """Chunker that splits on the semantic similarity of consecutive sentences."""
+
     def __init__(
         self,
         overlap: int = 0,
         similarity_threshold: float = 0.3,
         model: str = "all-MiniLM-L6-v2",
-        nltk_model: str = "punkt_tab"
+        nltk_model: str = "punkt_tab",
     ):
         try:
-            from sentence_transformers import SentenceTransformer
-            import numpy as np
             import nltk
+            import numpy as np
+            from sentence_transformers import SentenceTransformer
 
             self.model = SentenceTransformer(model)
             self.np = np
             self.nltk = nltk
             self.nltk.download(nltk_model, quiet=True)
-        except:
+        except ImportError:
             raise ImportError(
                 "`sentence_transformers`, `numpy`, and `nltk` must be "
                 "installed to use `SemanticChunker`. Run the following command to "
@@ -92,7 +99,7 @@ class SemanticChunker(Chunker):
             )
         self.overlap = overlap
         self.similarity_threshold = similarity_threshold
-        
+
     def _create_chunks(self, sentences: list[str], embeddings) -> list[str]:
         chunks = []
         current_chunk = []
@@ -106,7 +113,6 @@ class SemanticChunker(Chunker):
         current_chunk.append(sentences[-1])
         chunks.append(" ".join(current_chunk))
         return chunks
-        
 
     def chunk(self, text: str) -> list[str]:
         sentences = self.nltk.tokenize.sent_tokenize(text)

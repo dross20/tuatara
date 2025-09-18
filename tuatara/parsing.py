@@ -1,22 +1,24 @@
-from tuatara.pipeline import PipelineStep
-from pathlib import Path
-from dataclasses import dataclass
-from tuatara.document import Document, Page
 import warnings
-from abc import ABC, abstractmethod
+from abc import abstractmethod
+from pathlib import Path
+
+from tuatara.document import Document, Page
+from tuatara.pipeline import PipelineStep
 
 
 class AutoParser(PipelineStep):
     """Filetype-agnostic document parser."""
+
     _registry = {}
-    
+
     @classmethod
     def register_parser(cls, extension: str):
         def decorator(target):
             cls._registry[extension] = target
             return target
+
         return decorator
-    
+
     def forward(self, docs: str | Path | Document | list[Document]):
         if not isinstance(docs, list):
             docs = [docs]
@@ -37,6 +39,7 @@ class AutoParser(PipelineStep):
                 out_docs.extend(parser().forward(doc))
         return out_docs
 
+
 class Parser(PipelineStep):
     def forward(self, data: str | Path | Document | list[Document]) -> list[Document]:
         if not isinstance(data, list):
@@ -49,21 +52,23 @@ class Parser(PipelineStep):
         return data
 
     @abstractmethod
-    def parse(self, path: Path) -> list[str]:
-        ...
+    def parse(self, path: Path) -> list[str]: ...
+
 
 @AutoParser.register_parser(".txt")
 class TXTParser(Parser):
     def parse(self, path: Path) -> list[str]:
         with open(path, "r") as file:
-            return [file.read()] 
+            return [file.read()]
+
 
 @AutoParser.register_parser(".pdf")
 class PDFParser(Parser):
     def __init__(self):
         import pdfplumber
+
         self.pdfplumber = pdfplumber
-    
+
     def parse(self, path: Path) -> list[str]:
         pages = []
         with self.pdfplumber.open(path) as pdf:
