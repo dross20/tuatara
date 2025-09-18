@@ -1,18 +1,13 @@
-from pipeline import PipelineStep
+from tuatara.pipeline import PipelineStep
 from pathlib import Path
 from dataclasses import dataclass
-from document import Document, Page
+from tuatara.document import Document, Page
 import warnings
 from abc import ABC, abstractmethod
 
-@dataclass
-class ParsedResult():
-    text: str
-    src_doc: str
-    src_page: int
 
-
-class FileParser(PipelineStep):
+class AutoParser(PipelineStep):
+    """Filetype-agnostic document parser."""
     _registry = {}
     
     @classmethod
@@ -57,13 +52,13 @@ class Parser(PipelineStep):
     def parse(self, path: Path) -> list[str]:
         ...
 
-@FileParser.register_parser(".txt")
+@AutoParser.register_parser(".txt")
 class TXTParser(Parser):
     def parse(self, path: Path) -> list[str]:
         with open(path, "r") as file:
             return [file.read()] 
 
-@FileParser.register_parser(".pdf")
+@AutoParser.register_parser(".pdf")
 class PDFParser(Parser):
     def __init__(self):
         import pdfplumber

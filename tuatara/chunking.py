@@ -1,5 +1,5 @@
-from pipeline import PipelineStep
-from document import Document, Page
+from tuatara.pipeline import PipelineStep
+from tuatara.document import Document, Page
 from abc import abstractmethod
 
 class Chunker(PipelineStep):
