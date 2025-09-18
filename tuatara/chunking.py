@@ -5,7 +5,18 @@ from tuatara.pipeline import PipelineStep
 
 
 class Chunker(PipelineStep):
+    """Abstract class that defines the interface for chunkers."""
+
     def forward(self, data: Document | list[Document]) -> list[Document]:
+        """
+        Breaks a document's text down into smaller chunks.
+
+        Args:
+            data: The document(s) from which to generate chunks.
+        Returns:
+            A list of documents whose `chunks` attributes are populated by the
+            generated chunks.
+        """
         if not isinstance(data, list):
             data = [data]
         for doc in data:
@@ -14,7 +25,16 @@ class Chunker(PipelineStep):
         return data
 
     @abstractmethod
-    def chunk(self, text: str) -> list[str]: ...
+    def _chunk(self, text: str) -> list[str]:
+        """
+        Accepts a string and returns a list of chunks.
+
+        Args:
+            text: The string to be broken down into smaller chunks.
+        Returns:
+            out: A list of chunks made from the text.
+        """
+        ...
 
 
 class TokenChunker(Chunker):
@@ -36,7 +56,7 @@ class TokenChunker(Chunker):
         self.overlap = overlap
         self.encoding_name = encoding_name
 
-    def chunk(self, text: str) -> list[str]:
+    def _chunk(self, text: str) -> list[str]:
         encoding = self.tiktoken.get_encoding(self.encoding_name)
         tokens = encoding.encode(text, disallowed_special=())
         chunks = [
@@ -63,7 +83,7 @@ class SentenceChunker(Chunker):
         self.chunk_size = chunk_size
         self.overlap = overlap
 
-    def chunk(self, text: str) -> list[str]:
+    def _chunk(self, text: str) -> list[str]:
         sentences = self.nltk.tokenize.sent_tokenize(text)
         chunks = [
             " ".join(sentences[i : i + self.chunk_size])
@@ -100,7 +120,16 @@ class SemanticChunker(Chunker):
         self.overlap = overlap
         self.similarity_threshold = similarity_threshold
 
-    def _create_chunks(self, sentences: list[str], embeddings) -> list[str]:
+    def _merge_on_similarity(self, sentences: list[str], embeddings) -> list[str]:
+        """
+        Merge consecutive sentences based on the similarity of their embeddings. If
+        their similarity is above the predefined similarity threshold, include them in
+        the same chunk. Otherwise, start a new chunk.
+
+        Args:
+            sentences: A list of strings containing sentences to be merged.
+            embeddings: The embedding from an encoder for each sentence.
+        """
         chunks = []
         current_chunk = []
         for i in range(len(embeddings) - 1):
@@ -114,8 +143,8 @@ class SemanticChunker(Chunker):
         chunks.append(" ".join(current_chunk))
         return chunks
 
-    def chunk(self, text: str) -> list[str]:
+    def _chunk(self, text: str) -> list[str]:
         sentences = self.nltk.tokenize.sent_tokenize(text)
         embeddings = self.model.encode(sentences)
-        chunks = self._create_chunks(sentences, embeddings)
+        chunks = self._merge_on_similarity(sentences, embeddings)
         return chunks
