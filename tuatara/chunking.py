@@ -23,7 +23,7 @@ class Chunker(PipelineStep):
             data = [data]
         for doc in data:
             for page in doc.pages:
-                page.chunks = self.chunk(page.text)
+                page.chunks = self._chunk(page.text)
         return data
 
     @abstractmethod

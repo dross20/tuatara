@@ -28,8 +28,8 @@ class Inference(ABC):
         self,
         model: str | None,
         prompt: str | None,
-        attachments: list[Any] | None,
-        request: InferenceRequest | None,
+        attachments: list[Any] | None = None,
+        request: InferenceRequest | None = None,
     ) -> str:
         """
         Generates a textual response using an LLM.
@@ -82,5 +82,5 @@ class OpenAIInference(Inference):
     def _get_completion(
         self, model: str, prompt: str, attachments: list[Any] | None
     ) -> str:
-        completion = self.client.responses.create(model=model, input=prompt)
+        completion = self.client.responses.create(model=model, input=prompt).output[0].content[0].text
         return completion

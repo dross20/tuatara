@@ -99,7 +99,7 @@ class TXTParser(Parser):
     """Parser for `.txt` files."""
 
     def parse(self, path: Path) -> list[str]:
-        with open(path, "r") as file:
+        with open(path, "r", encoding="utf-8") as file:
             return [file.read()]
 
 
