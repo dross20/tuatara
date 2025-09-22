@@ -33,7 +33,7 @@ class Document:
         )
 
 
-@dataclass
+@dataclass(slots=True)
 class Page:
     """Encapsulates a document page's content and and metadata."""
 

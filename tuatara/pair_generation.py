@@ -15,7 +15,7 @@ if TYPE_CHECKING:
     from tuatara.document import Page
 
 
-@dataclass
+@dataclass(slots=True)
 class FineTuningPair:
     """
     Model class for representing fine-tuning pairs.
