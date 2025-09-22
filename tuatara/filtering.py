@@ -28,16 +28,19 @@ class Filter(PipelineStep):
         """
         ...
 
+
 class SemanticSimilarityFilter(Filter):
+    """Filter for removing semantically similar pairs."""
+
     def __init__(
         self,
         model: str = "all-MiniLM-L6-v2",
         representative_strategy: Literal["first", "random", "centroid"] = "first",
-        clustering_args: dict | None = None
+        clustering_args: dict | None = None,
     ):
         try:
-            from sklearn.cluster import DBSCAN
             import numpy as np
+            from sklearn.cluster import DBSCAN
 
             self.dbscan = DBSCAN
             self.np = np
@@ -49,6 +52,7 @@ class SemanticSimilarityFilter(Filter):
             )
         try:
             from sentence_transformers import SentenceTransformer
+
             self.model = SentenceTransformer(model)
         except ImportError:
             raise ImportError(
@@ -57,10 +61,10 @@ class SemanticSimilarityFilter(Filter):
                 "`pip install sentence-transformers`"
             )
         self.representative_strategy = representative_strategy
-        self.clustering_args = clustering_args if clustering_args is not None else {
-            "metric": "cosine"
-        }
-        
+        self.clustering_args = (
+            clustering_args if clustering_args is not None else {"metric": "cosine"}
+        )
+
     def _filter(self, pairs: list[FineTuningPair]) -> list[FineTuningPair]:
         # Embed pairs
         pair_texts = [f"{pair.prompt} {pair.response}" for pair in pairs]
@@ -68,7 +72,7 @@ class SemanticSimilarityFilter(Filter):
 
         # Create a new `DBSCAN` instance
         dbscan = self.dbscan(**self.clustering_args)
-        
+
         # Cluster pair embeddings
         clustering = dbscan.fit(embeddings)
         labels = clustering.labels_
