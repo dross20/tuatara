@@ -82,5 +82,10 @@ class OpenAIInference(Inference):
     def _get_completion(
         self, model: str, prompt: str, attachments: list[Any] | None
     ) -> str:
-        completion = self.client.responses.create(model=model, input=prompt).output[0].content[0].text
+        completion = (
+            self.client.responses.create(model=model, input=prompt)
+            .output[0]
+            .content[0]
+            .text
+        )
         return completion

@@ -99,8 +99,7 @@ class TXTParser(Parser):
     """Parser for `.txt` files."""
 
     def parse(self, path: Path) -> list[str]:
-        with open(path, "r", encoding="utf-8") as file:
-            return [file.read()]
+        return [path.read_text(encoding="utf-8")]
 
 
 @AutoParser.register_parser(".pdf")

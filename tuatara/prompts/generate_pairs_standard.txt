@@ -1,0 +1,22 @@
+Create educational question-answer pairs from the following text. Focus on generating pairs that would help someone learn and understand the key concepts.
+
+Context: {summary}
+
+Text:
+{chunk_text}
+
+Generate exactly 4 pairs in this JSON format:
+[
+    {{"question": "What is...", "answer": "The answer explaining..."}},
+    {{"question": "How does...", "answer": "The process involves..."}},
+    {{"question": "Why is...", "answer": "This is important because..."}},
+    {{"question": "Explain...", "answer": "The explanation is..."}}
+]
+
+Requirements:
+- Questions should test understanding, not just memory
+- Answers should be 2-3 sentences and self-contained
+- Base everything on the provided text only
+- Use clear, educational language
+
+JSON output:

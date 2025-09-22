@@ -1,0 +1,6 @@
+Summarize the following page content in 2-3 sentences. Focus on the main ideas, key information, and any important details. Be concise but capture the essential meaning.
+
+Page Content:
+{page_text}
+
+Summary:

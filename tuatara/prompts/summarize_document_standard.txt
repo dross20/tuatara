@@ -1,0 +1,16 @@
+You are tasked with creating a comprehensive summary of a document based on individual page summaries.
+
+Document Information:
+- Title: {title}
+- Total Pages: {document_length}
+
+Page Summaries:
+{summaries}
+
+Create a concise but comprehensive summary of the entire document. Focus on:
+1. Main topics and themes
+2. Key findings or conclusions
+3. Document structure and organization
+4. Important concepts or terminology
+
+Summary (1 paragraph):
