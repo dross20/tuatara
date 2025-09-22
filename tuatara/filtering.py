@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from abc import abstractmethod
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal
 
 from tuatara.pipeline import PipelineStep
 
@@ -27,3 +27,82 @@ class Filter(PipelineStep):
             The list of fine-tuning pairs that make it through the filter.
         """
         ...
+
+class SemanticSimilarityFilter(Filter):
+    def __init__(
+        self,
+        model: str = "all-MiniLM-L6-v2",
+        representative_strategy: Literal["first", "random", "centroid"] = "first",
+        clustering_args: dict | None = None
+    ):
+        try:
+            from sklearn.cluster import DBSCAN
+            import numpy as np
+
+            self.dbscan = DBSCAN
+            self.np = np
+        except ImportError:
+            raise ImportError(
+                "The `sklearn` library must be installed to use"
+                "`SemanticSimilarityFilter.` To install it, run the following command:"
+                "`pip install scikit-learn`"
+            )
+        try:
+            from sentence_transformers import SentenceTransformer
+            self.model = SentenceTransformer(model)
+        except ImportError:
+            raise ImportError(
+                "The `sentence-transformers` library must be installed to use"
+                "`SemanticSimilarityFilter`. To install it, run the following command:"
+                "`pip install sentence-transformers`"
+            )
+        self.representative_strategy = representative_strategy
+        self.clustering_args = clustering_args if clustering_args is not None else {
+            "metric": "cosine"
+        }
+        
+    def _filter(self, pairs: list[FineTuningPair]) -> list[FineTuningPair]:
+        # Embed pairs
+        pair_texts = [f"{pair.prompt} {pair.response}" for pair in pairs]
+        embeddings = self.model.encode(pair_texts, convert_to_numpy=True)
+
+        # Create a new `DBSCAN` instance
+        dbscan = self.dbscan(**self.clustering_args)
+        
+        # Cluster pair embeddings
+        clustering = dbscan.fit(embeddings)
+        labels = clustering.labels_
+        unique_labels = set(labels)
+
+        # Handle noise points (unique pairs)
+        noise_mask = labels == -1
+        noise_indices = self.np.where(noise_mask)[0]
+
+        filtered_pairs = [pairs[index] for index in noise_indices]
+
+        if -1 in unique_labels:
+            unique_labels.remove(-1)
+
+        # Handle clustered points (similar pairs)
+        for label in unique_labels:
+            label_mask = labels == label
+            label_indices = self.np.where(label_mask)[0]
+
+            # Choose first pair in the cluster to be the representative
+            if self.representative_strategy == "first":
+                representative = pairs[label_indices[0]]
+            # Choose representative arbitrarily from within the cluster
+            elif self.representative_strategy == "random":
+                random_index = self.np.random.choice(label_indices)
+                representative = pairs[random_index]
+            # Choose representative closest to the cluster's centroid
+            elif self.representative_strategy == "centroid":
+                cluster_embeddings = embeddings[label_indices]
+                centroid = self.np.mean(cluster_embeddings, axis=0)
+                distances = self.np.linalg.norm(cluster_embeddings - centroid, axis=1)
+                closest_index = label_indices[self.np.argmin(distances)]
+                representative = pairs[closest_index]
+
+            filtered_pairs.append(representative)
+
+        return filtered_pairs
