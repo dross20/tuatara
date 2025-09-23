@@ -38,6 +38,15 @@ class SemanticSimilarityFilter(Filter):
         representative_strategy: Literal["first", "random", "centroid"] = "first",
         clustering_args: dict | None = None,
     ):
+        """
+        Args:
+            model: The ID of the encoder model to use.
+            representative_strategy: The strategy to use for selecting a representative
+                                    pair from a cluster.
+            clustering_args: The keyword arguments to use when instantiating the
+                            `sklearn.cluster.DBSCAN` object. Defaults to
+                            `{"metric": "cosine"}`.
+        """
         try:
             import numpy as np
             from sklearn.cluster import DBSCAN
@@ -108,5 +117,49 @@ class SemanticSimilarityFilter(Filter):
                 representative = pairs[closest_index]
 
             filtered_pairs.append(representative)
+
+        return filtered_pairs
+
+class NLISourceGroundingFilter(Filter):
+    """Filter for removing pairs without grounding in their source chunks."""
+
+    def __init__(
+        self,
+        model: str = "cross-encoder/nli-deberta-v3-base",
+        entailment_threshold: float = 0.5
+    ):
+        """
+        Args:
+            model: The ID of the NLI model to use.
+            entailment_threshold: The minimum required predicted entailment score for a
+                                  pair to be considered sufficiently grounded. 
+        """
+        try:
+            from sentence_transformers import CrossEncoder
+
+            self.cross_encoder = CrossEncoder(model)
+        except ImportError:
+            raise ImportError(
+                "The `sentence-transformers` library must be installed to use"
+                "`NLISourceGroundingFilter`. To install it, run the following command:"
+                "`pip install sentence-transformers`"
+            )
+        self.entailment_threshold = entailment_threshold
+    
+    def _filter(self, pairs: list[FineTuningPair]) -> list[FineTuningPair]:
+        pair_texts = [f"{pair.prompt} {pair.response}" for pair in pairs]
+        sources = [" ".join(pair.source_chunks) for pair in pairs]
+        grounding_inputs = list(zip(pair_texts, sources))
+
+        scores = self.cross_encoder.predict(grounding_inputs)
+
+        # The predicted entailment probability is stored in axis 1, index 1 of
+        # `CrossEncoder.predict`'s return array
+        entailment_scores = scores[:, 1]
+
+        filtered_pairs = [
+            pair for pair, score in zip(pairs, entailment_scores)
+            if score >= self.entailment_threshold
+        ]
 
         return filtered_pairs
