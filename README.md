@@ -20,7 +20,13 @@
 > "Artificial intelligence is only as good as the data it learns from." - Unknown
 >
 
-**Tuatara 🦎** is a library for generating fine-tuning pairs for LLM post training.
+## 🦎 What is Tuatara?
+
+Tuatara is a library for generating fine-tuning pairs for large language model (LLM) post training.
+
+## 🤔 Why Tuatara?
+
+Fine-tuning large language models requires high-quality training data pairs that are well grounded in their source documents. Creating these pairs manually is laborious and error-prone, and existing tools often lack flexibility or fail to scale across different document types and domains. Tuatara addresses these challenges directly.
 
 ## 📦 Installation
 Run the following command to install Tuatara:
