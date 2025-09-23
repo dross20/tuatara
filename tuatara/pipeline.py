@@ -6,6 +6,8 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import Any, List
 
+from inference import AutoInferenceMeta
+
 
 @dataclass
 class PipelineResult:
@@ -13,7 +15,7 @@ class PipelineResult:
     result: Any
 
 
-class Pipeable(ABC):
+class Pipeable(ABC, metaclass=AutoInferenceMeta):
     @abstractmethod
     def call(self, data) -> tuple[Any, PipelineResult]: ...
 
