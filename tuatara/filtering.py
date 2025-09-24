@@ -21,7 +21,7 @@ class Filter(PipelineStep):
 
         logger.debug(f"{len(filtered_pairs)} pairs remaining after filtering")
 
-        return self._filter(data)
+        return filtered_pairs
 
     @abstractmethod
     def _filter(self, pairs: list[FineTuningPair]) -> list[FineTuningPair]:
