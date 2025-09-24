@@ -55,8 +55,7 @@ def default_pipeline(
     from tuatara.pair_generation import StandardPairGenerator
     from tuatara.parsing import AutoParser
 
-    if inference is None:
-        inference = OpenAIInference()
+    inference = inference or OpenAIInference()
 
     return (
         AutoParser()
