@@ -4,6 +4,8 @@ import warnings
 from abc import abstractmethod
 from pathlib import Path
 
+from loguru import logger
+
 from tuatara.document import Document, Page
 from tuatara.pipeline import PipelineStep
 
@@ -73,6 +75,9 @@ class Parser(PipelineStep):
         """
         if not isinstance(data, list):
             data = [data]
+
+        logger.info(f"Parsing {len(data)} documents")
+
         data = [Document(doc) if not isinstance(doc, Document) else doc for doc in data]
         parsed_docs = [self.parse(doc.path) for doc in data]
         for doc, parsed_doc in zip(data, parsed_docs):

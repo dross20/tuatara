@@ -2,6 +2,8 @@
 
 from abc import abstractmethod
 
+from loguru import logger
+
 from tuatara.document import Document
 from tuatara.pipeline import PipelineStep
 
@@ -21,9 +23,17 @@ class Chunker(PipelineStep):
         """
         if not isinstance(data, list):
             data = [data]
+
+        logger.info(f"Chunking {len(data)} documents")
+
+        total_chunks = 0
         for doc in data:
             for page in doc.pages:
                 page.chunks = self._chunk(page.text)
+                total_chunks += len(page.chunks)
+
+        logger.info(f"Created {total_chunks} chunks from {len(data)} documents")
+
         return data
 
     @abstractmethod

@@ -6,7 +6,8 @@ build-backend = "hatchling.build"
 dynamic = ["version"]
 name = "tuatara"
 dependencies = [
-    "openai"
+    "openai",
+    "loguru"
 ]
 requires-python = ">=3.9"
 authors = [

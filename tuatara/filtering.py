@@ -3,6 +3,8 @@ from __future__ import annotations
 from abc import abstractmethod
 from typing import TYPE_CHECKING, Literal
 
+from loguru import logger
+
 from tuatara.pipeline import PipelineStep
 
 if TYPE_CHECKING:
@@ -13,6 +15,12 @@ class Filter(PipelineStep):
     """Abstract class that defines the interface for filters."""
 
     def forward(self, data: list[FineTuningPair]) -> list[FineTuningPair]:
+        logger.info(f"Filtering {len(data)} fine-tuning pairs")
+
+        filtered_pairs = self._filter(data)
+
+        logger.info(f"{len(filtered_pairs)} pairs remaining after filtering")
+
         return self._filter(data)
 
     @abstractmethod

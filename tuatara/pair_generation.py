@@ -6,6 +6,8 @@ from abc import abstractmethod
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
+from loguru import logger
+
 from tuatara.document import Document
 from tuatara.inference import Inference
 from tuatara.pipeline import PipelineStep
@@ -46,6 +48,8 @@ class PairGenerator(PipelineStep):
         Returns:
             A list of `FineTuningPair` objects.
         """
+        logger.info(f"Creating fine-tuning pairs from {len(data)} documents")
+
         all_pairs = []
         for doc in data:
             doc_metadata = self._prepare_document_metadata(doc)
@@ -62,6 +66,9 @@ class PairGenerator(PipelineStep):
                     for prompt, response in pair_tuples
                 ]
                 all_pairs.extend(pairs)
+
+        logger.info(f"Created {len(all_pairs)} fine-tuning pairs")
+
         return all_pairs
 
     @abstractmethod

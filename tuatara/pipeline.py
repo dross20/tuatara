@@ -4,7 +4,10 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
+from time import time
 from typing import Any, List
+
+from loguru import logger
 
 from tuatara.inference import AutoInferenceMeta
 
@@ -58,8 +61,17 @@ class PipelineStep(Pipeable):
         return PipelineResult(type(self).__name__, result_value)
 
     def call(self, data) -> tuple[Any, PipelineResult]:
+        logger.info(f"Running step {type(self).__name__}")
+        start_time = time()
+
         result_value = self.forward(data)
         result_obj = self.create_result(result_value)
+
+        elapsed_time = time() - start_time
+        logger.info(
+            f"Finished running step {type(self).__name__} in {elapsed_time:.2f}s"
+        )
+
         return result_value, result_obj
 
 
