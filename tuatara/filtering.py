@@ -120,19 +120,20 @@ class SemanticSimilarityFilter(Filter):
 
         return filtered_pairs
 
+
 class NLISourceGroundingFilter(Filter):
     """Filter for removing pairs without grounding in their source chunks."""
 
     def __init__(
         self,
         model: str = "cross-encoder/nli-deberta-v3-base",
-        entailment_threshold: float = 0.5
+        entailment_threshold: float = 0.5,
     ):
         """
         Args:
             model: The ID of the NLI model to use.
             entailment_threshold: The minimum required predicted entailment score for a
-                                  pair to be considered sufficiently grounded. 
+                                  pair to be considered sufficiently grounded.
         """
         try:
             from sentence_transformers import CrossEncoder
@@ -145,7 +146,7 @@ class NLISourceGroundingFilter(Filter):
                 "`pip install sentence-transformers`"
             )
         self.entailment_threshold = entailment_threshold
-    
+
     def _filter(self, pairs: list[FineTuningPair]) -> list[FineTuningPair]:
         pair_texts = [f"{pair.prompt} {pair.response}" for pair in pairs]
         sources = [" ".join(pair.source_chunks) for pair in pairs]
@@ -158,7 +159,8 @@ class NLISourceGroundingFilter(Filter):
         entailment_scores = scores[:, 1]
 
         filtered_pairs = [
-            pair for pair, score in zip(pairs, entailment_scores)
+            pair
+            for pair, score in zip(pairs, entailment_scores)
             if score >= self.entailment_threshold
         ]
 

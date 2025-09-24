@@ -2,28 +2,29 @@
 
 from __future__ import annotations
 
-from abc import ABC, abstractmethod
-from dataclasses import dataclass
-from typing import Any, TYPE_CHECKING, Callable
 import inspect
+from abc import ABC, ABCMeta, abstractmethod
+from dataclasses import dataclass
+from typing import TYPE_CHECKING, Any, Callable
 
 if TYPE_CHECKING:
     from openai import OpenAI
 
 
-class AutoInferenceMeta(type):
+class AutoInferenceMeta(ABCMeta):
     """
     Metaclass for automatically converting inference clients to `Inference` instances.
     """
+
     _factory_registry = {}
 
     def __call__(cls, *args, **kwargs):
-        converted_args, converted_kwargs = cls._convert_args(args, kwargs)
+        converted_args, converted_kwargs = cls._convert_args(cls, args, kwargs)
         return super().__call__(*converted_args, **converted_kwargs)
 
     @classmethod
     def _convert_args(
-        cls, args: list[Any], kwargs: dict[Any]
+        cls, child: type, args: list[Any], kwargs: dict[Any]
     ) -> tuple[tuple[Any], dict[str, Any]]:
         """
         Converts any argument whose type annotation is `Inference` into an `Inference`
@@ -35,46 +36,42 @@ class AutoInferenceMeta(type):
         Returns:
             A tuple containing the converted positional arguments and keyword arguments.
         """
-        sig = inspect.signature(cls.__init__)
+        sig = inspect.signature(child.__init__)
         params = sig.parameters
-        
+
         converted_args, converted_kwargs = [], {}
 
         positional_params = [
-            param for param in params.values()
-            if param.kind in [
+            param
+            for param in params.values()
+            if param.kind
+            in [
                 inspect.Parameter.POSITIONAL_ONLY,
-                inspect.Parameter.POSITIONAL_OR_KEYWORD
+                inspect.Parameter.POSITIONAL_OR_KEYWORD,
             ]
             and param.name != "self"
         ]
 
+        # Check for positional parameters with `Inference` annotation
         for i, arg in enumerate(args):
             if i < len(positional_params):
                 param = positional_params[i]
-                if param.annotation == Inference and not isinstance(arg, Inference):
-                    try:
-                        inference = cls._from_object(arg)
-                        converted_args.append(inference)
-                    except Exception:
-                        raise TypeError(
-                            f"Object of type {type(arg).__name__} could not be cast to `Inference`"
-                        )
+                if param.annotation == "Inference" and not isinstance(arg, Inference):
+                    inference = cls._from_object(arg)
+                    converted_args.append(inference)
                 else:
                     converted_args.append(arg)
             else:
                 converted_args.append(arg)
 
+        # Check for keyword parameters with `Inference annotation`
         for kwarg_name, kwarg_value in kwargs.items():
             if kwarg_name in params:
-                if params[kwarg_name].annotation == Inference and not isinstance(kwarg_value, Inference):
-                    try:
-                        inference = cls._from_object(kwarg_value)
-                        converted_kwargs[kwarg_name] = inference
-                    except Exception:
-                        raise TypeError(
-                            f"Object of type {type(kwarg_value).__name__} could not be cast to `Inference`"
-                        )
+                if params[kwarg_name].annotation == "Inference" and not isinstance(
+                    kwarg_value, Inference
+                ):
+                    inference = cls._from_object(kwarg_value)
+                    converted_kwargs[kwarg_name] = inference
                 else:
                     converted_kwargs[kwarg_name] = kwarg_value
             else:
@@ -83,11 +80,14 @@ class AutoInferenceMeta(type):
         return tuple(converted_args), converted_kwargs
 
     @classmethod
-    def _register_factory_method(cls, target_cls: type):
+    def _register_factory_method(cls, target_cls: str):
         """Register a factory method for a given inference client."""
+
         def decorator(function: Callable):
-            cls._factory_registry[target_cls] = function
+            owning_class_name = function.__qualname__.split(".")[0]
+            cls._factory_registry[target_cls] = (owning_class_name, function.__name__)
             return function
+
         return decorator
 
     @classmethod
@@ -100,10 +100,23 @@ class AutoInferenceMeta(type):
         Returns:
             The newly created `Inference` instance.
         """
-        obj_type = type(obj)
-        factory_fn = cls._factory_registry[obj_type]
-        inference = factory_fn(obj)
-        return inference
+        try:
+            obj_type = type(obj).__name__
+            factory_fn_class_name, factory_fn_name = cls._factory_registry[obj_type]
+            factory_fn_class = next(
+                fc
+                for fc in Inference.__subclasses__()
+                if fc.__name__ == factory_fn_class_name
+            )
+            factory_fn = getattr(factory_fn_class, factory_fn_name)
+            inference = factory_fn(obj)
+            return inference
+        except Exception as e:
+            print(e)
+            raise TypeError(
+                f"Object of type `{type(obj).__name__}` could not be converted to "
+                "`Inference`. No corresponding factory function is registered."
+            )
 
 
 @dataclass(slots=True)
@@ -179,9 +192,9 @@ class OpenAIInference(Inference):
                 "The `openai` library must be installed to use `OpenAIInference`. "
                 "To install it, run the following command: `pip install openai`"
             )
-        
+
     @classmethod
-    @AutoInferenceMeta._register_factory_method(OpenAI)
+    @AutoInferenceMeta._register_factory_method("OpenAI")
     def _from_client(cls, client: OpenAI) -> Inference:
         inference = cls()
         inference.client = client
