@@ -76,7 +76,7 @@ class Parser(PipelineStep):
         if not isinstance(data, list):
             data = [data]
 
-        logger.info(f"Parsing {len(data)} documents")
+        logger.debug(f"Parsing {len(data)} documents")
 
         data = [Document(doc) if not isinstance(doc, Document) else doc for doc in data]
         parsed_docs = [self.parse(doc.path) for doc in data]

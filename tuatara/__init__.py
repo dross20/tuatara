@@ -1,10 +1,42 @@
 from __future__ import annotations
 
+import sys
 from typing import TYPE_CHECKING
+
+from loguru import logger
 
 if TYPE_CHECKING:
     from tuatara.inference import Inference
     from tuatara.pipeline import Pipeline
+
+
+def _format_log(record):
+    """
+    Returns a formatted log string. Includes the `step` metadata in the log.
+
+    Args:
+        record: The log record.
+    Returns:
+        The log string, containing the date time, log level, step (if applicable), call
+        location, and message.
+    """
+    missing_step_str = "None"
+    extra = record.get("extra", {})
+    step = extra.get("step", missing_step_str)
+    step = f"{step: <15}"
+    if step.strip() == missing_step_str:
+        step = f"<dim>{step}</dim>"
+
+    format_str = (
+        "<green>{time:YYYY-MM-DD HH:mm:ss.SSS}</green> | <level>{level: <8}</level> | "
+        f"<light-yellow>step</light-yellow> = <bold>{step}</bold> | "
+        "<cyan>{name}:{function}:{line}</cyan> - <level>{message}</level>\n"
+    )
+    return format_str
+
+
+logger.remove()
+logger.add(sys.stderr, colorize=True, format=_format_log, level="WARNING")
 
 
 def default_pipeline(

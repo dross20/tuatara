@@ -15,11 +15,11 @@ class Filter(PipelineStep):
     """Abstract class that defines the interface for filters."""
 
     def forward(self, data: list[FineTuningPair]) -> list[FineTuningPair]:
-        logger.info(f"Filtering {len(data)} fine-tuning pairs")
+        logger.debug(f"Filtering {len(data)} fine-tuning pairs")
 
         filtered_pairs = self._filter(data)
 
-        logger.info(f"{len(filtered_pairs)} pairs remaining after filtering")
+        logger.debug(f"{len(filtered_pairs)} pairs remaining after filtering")
 
         return self._filter(data)
 

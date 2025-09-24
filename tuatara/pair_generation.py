@@ -48,7 +48,7 @@ class PairGenerator(PipelineStep):
         Returns:
             A list of `FineTuningPair` objects.
         """
-        logger.info(f"Creating fine-tuning pairs from {len(data)} documents")
+        logger.debug(f"Creating fine-tuning pairs from {len(data)} documents")
 
         all_pairs = []
         for doc in data:
@@ -67,7 +67,7 @@ class PairGenerator(PipelineStep):
                 ]
                 all_pairs.extend(pairs)
 
-        logger.info(f"Created {len(all_pairs)} fine-tuning pairs")
+        logger.debug(f"Created {len(all_pairs)} fine-tuning pairs")
 
         return all_pairs
 

@@ -24,7 +24,7 @@ class Chunker(PipelineStep):
         if not isinstance(data, list):
             data = [data]
 
-        logger.info(f"Chunking {len(data)} documents")
+        logger.debug(f"Chunking {len(data)} documents")
 
         total_chunks = 0
         for doc in data:
@@ -32,7 +32,7 @@ class Chunker(PipelineStep):
                 page.chunks = self._chunk(page.text)
                 total_chunks += len(page.chunks)
 
-        logger.info(f"Created {total_chunks} chunks from {len(data)} documents")
+        logger.debug(f"Created {total_chunks} chunks from {len(data)} documents")
 
         return data
 

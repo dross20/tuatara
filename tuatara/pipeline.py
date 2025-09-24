@@ -61,14 +61,15 @@ class PipelineStep(Pipeable):
         return PipelineResult(type(self).__name__, result_value)
 
     def call(self, data) -> tuple[Any, PipelineResult]:
-        logger.info(f"Running step {type(self).__name__}")
+        logger.debug(f"Running step {type(self).__name__}")
         start_time = time()
 
-        result_value = self.forward(data)
-        result_obj = self.create_result(result_value)
+        with logger.contextualize(step=type(self).__name__):
+            result_value = self.forward(data)
+            result_obj = self.create_result(result_value)
 
         elapsed_time = time() - start_time
-        logger.info(
+        logger.debug(
             f"Finished running step {type(self).__name__} in {elapsed_time:.2f}s"
         )
 
