@@ -1,3 +1,5 @@
+"""Contains utility functions for `tuatara`."""
+
 import json
 from importlib import resources
 

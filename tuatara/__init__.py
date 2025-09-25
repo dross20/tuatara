@@ -1,3 +1,5 @@
+"""Library for generating high-quality fine-tuning pairs."""
+
 from __future__ import annotations
 
 import sys

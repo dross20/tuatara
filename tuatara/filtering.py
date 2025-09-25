@@ -1,3 +1,5 @@
+"""Contains all classes related to fine-tuning pair filtering."""
+
 from __future__ import annotations
 
 from abc import abstractmethod
