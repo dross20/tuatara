@@ -16,9 +16,11 @@
 
 ---
 
->
-> "Artificial intelligence is only as good as the data it learns from." - Unknown
->
+<p align="center">
+<em>"Artificial intelligence is only as good as the data it learns from."</em><br>
+- Unknown
+</p>
+
 
 ## 🦎 What is Tuatara?
 
