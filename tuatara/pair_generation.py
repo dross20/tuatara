@@ -116,7 +116,7 @@ class PairGenerator(PipelineStep):
 class StandardPairGenerator(PairGenerator):
     """Pair generator that creates pairs by prompting an LLM."""
 
-    def __init__(self, inference: Inference, model: str):
+    def __init__(self, inference: Inference, model: str | None = None):
         super().__init__()
         self.inference = inference
         self.model = model
