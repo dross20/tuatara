@@ -5,10 +5,14 @@ from __future__ import annotations
 import inspect
 from abc import ABC, ABCMeta, abstractmethod
 from dataclasses import dataclass
+from functools import lru_cache
 from typing import TYPE_CHECKING, Any, Callable
+
+from loguru import logger
 
 if TYPE_CHECKING:
     from openai import OpenAI
+    from transformers import PreTrainedModel, TextGenerationPipeline
 
 
 class AutoInferenceMeta(ABCMeta):
@@ -156,13 +160,13 @@ class Inference(ABC):
                      this argument is passed in, all other arguments will be ignored.
         """
         return (
-            self._get_completion(**request)
+            self._get_completion(**vars(request))
             if request is not None
             else self._get_completion(model, prompt, attachments)
         )
 
     @abstractmethod
-    def _get_completion(model: str, prompt: str, attachments: list[Any] | None):
+    def _get_completion(self, model: str, prompt: str, attachments: list[Any] | None):
         """
         Makes a call to the inference backend.
 
@@ -210,3 +214,77 @@ class OpenAIInference(Inference):
             .text
         )
         return completion
+
+
+class HuggingFaceTransformersInference(Inference):
+    """
+    Inference backend for HuggingFace's `transformers` library. Used for obtaining text
+    completions from open source language models.
+    """
+
+    def __init__(
+        self,
+        model_kwargs: dict[str, Any] | None = None,
+        generation_kwargs: dict[str, Any] | None = None,
+    ):
+        try:
+            from transformers import pipeline
+
+            self.pipeline = pipeline
+        except ImportError:
+            raise ImportError(
+                "The `transformers` library must be installed to use "
+                "`HuggingFaceTransformersInference`. To install it, run the following "
+                "command: `pip install transformers`"
+            )
+        self.model_kwargs = model_kwargs or {}
+        self.generation_kwargs = generation_kwargs or {}
+
+    @classmethod
+    @AutoInferenceMeta._register_factory_method("PreTrainedModel")
+    def _from_model(cls, model: PreTrainedModel) -> HuggingFaceTransformersInference:
+        from transformers import AutoTokenizer, pipeline
+
+        tokenizer = AutoTokenizer.from_pretrained(model.config._name_or_path)
+
+        inference = cls()
+        inference._pipeline = pipeline(model=model, tokenizer=tokenizer)
+
+        return inference
+
+    @classmethod
+    @AutoInferenceMeta._register_factory_method("TextGenerationPipeline")
+    def _from_pipeline(
+        cls, pipeline: TextGenerationPipeline
+    ) -> HuggingFaceTransformersInference:
+        inference = cls()
+        inference._pipeline = pipeline
+        return inference
+
+    @lru_cache(maxsize=8)
+    def _get_pipeline(self, model_id: str, **kwargs) -> TextGenerationPipeline:
+        """
+        Creates a new `TextGenerationPipeline` instance.
+
+        Args:
+            model_id: The ID to use for retrieving the model and tokenizer from the
+                      HuggingFace Hub.
+        Returns:
+            A new pipeline, whose tokenizer and model are pulled from the HuggingFace
+            Hub.
+        """
+        if getattr(self, "_pipeline", None) is not None:
+            return self._pipeline
+        return self.pipeline(task="text-generation", model=model_id, **kwargs)
+
+    def _get_completion(
+        self, model: str, prompt: str, attachments: list[Any] | None
+    ) -> str:
+        if attachments is not None:
+            logger.warning(
+                "Attachments are not supported for the "
+                "`HuggingFaceTransformersInference` inference backend."
+            )
+        pipeline = self._get_pipeline(model, **self.model_kwargs)
+        response = pipeline(prompt, **self.generation_kwargs)
+        return response[0]["generated_text"]
