@@ -10,6 +10,8 @@ from typing import TYPE_CHECKING, Any, Callable
 
 from loguru import logger
 
+from tuatara.serializing import Serializable
+
 if TYPE_CHECKING:
     from openai import OpenAI
     from transformers import PreTrainedModel, TextGenerationPipeline
@@ -115,8 +117,7 @@ class AutoInferenceMeta(ABCMeta):
             factory_fn = getattr(factory_fn_class, factory_fn_name)
             inference = factory_fn(obj)
             return inference
-        except Exception as e:
-            print(e)
+        except Exception:
             raise TypeError(
                 f"Object of type `{type(obj).__name__}` could not be converted to "
                 "`Inference`. No corresponding factory function is registered."
@@ -139,7 +140,7 @@ class InferenceRequest:
     attachments: list[Any] | None
 
 
-class Inference(ABC):
+class Inference(ABC, Serializable):
     """Abstract class that defines the interface for LLM inference backends."""
 
     def generate(
@@ -295,6 +296,7 @@ class OllamaInference(Inference):
     Inference backend for Ollama. Used for obtaining completions from locally-served
     models.
     """
+
     def __init__(self):
         try:
             from ollama import chat
