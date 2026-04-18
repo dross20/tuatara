@@ -2,14 +2,18 @@
 
 from __future__ import annotations
 
+import json
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
+from pathlib import Path
 from time import time
 from typing import Any, List
 
+import yaml
 from loguru import logger
 
 from tuatara.inference import AutoInferenceMeta
+from tuatara.serializing import Serializable
 
 
 @dataclass
@@ -52,8 +56,35 @@ class Pipeline(Pipeable):
         if isinstance(value, Pipeline):
             return Pipeline([*self.steps, *value.steps])
 
+    def to_dict(self) -> dict[str, Any]:
+        return {"steps": [step.serialize() for step in self.steps]}
 
-class PipelineStep(Pipeable):
+    def to_json(self, path: Path | str) -> None:
+        with open(path, "w") as f:
+            json.dump(self.to_dict(), f, indent=2)
+
+    def to_yaml(self, path: Path | str) -> None:
+        with open(path, "w") as f:
+            yaml.dump(self.to_dict(), f, sort_keys=False, default_flow_style=False)
+
+    @classmethod
+    def from_dict(cls, dct: dict[str, Any]) -> Pipeline:
+        return cls(steps=[Serializable.deserialize(step) for step in dct["steps"]])
+
+    @classmethod
+    def from_json(cls, path: Path | str) -> Pipeline:
+        with open(path, "r") as f:
+            dct = json.load(f)
+        return cls.from_dict(dct)
+
+    @classmethod
+    def from_yaml(cls, path: Path | str) -> Pipeline:
+        with open(path, "r") as f:
+            dct = yaml.safe_load(f)
+        return cls.from_dict(dct)
+
+
+class PipelineStep(Pipeable, Serializable):
     @abstractmethod
     def forward(self, data): ...
 

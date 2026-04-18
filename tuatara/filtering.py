@@ -44,7 +44,7 @@ class SemanticSimilarityFilter(Filter):
 
     def __init__(
         self,
-        model: str = "all-MiniLM-L6-v2",
+        model_id: str = "all-MiniLM-L6-v2",
         representative_strategy: Literal["first", "random", "centroid"] = "first",
         clustering_args: dict | None = None,
     ):
@@ -72,7 +72,8 @@ class SemanticSimilarityFilter(Filter):
         try:
             from sentence_transformers import SentenceTransformer
 
-            self.model = SentenceTransformer(model)
+            self.model_id = model_id
+            self.model = SentenceTransformer(self.model_id)
         except ImportError:
             raise ImportError(
                 "The `sentence-transformers` library must be installed to use"
