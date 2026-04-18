@@ -288,3 +288,26 @@ class HuggingFaceTransformersInference(Inference):
         pipeline = self._get_pipeline(model, **self.model_kwargs)
         response = pipeline(prompt, **self.generation_kwargs)
         return response[0]["generated_text"]
+
+
+class OllamaInference(Inference):
+    """
+    Inference backend for Ollama. Used for obtaining completions from locally-served
+    models.
+    """
+    def __init__(self):
+        try:
+            from ollama import chat
+
+            self.chat = chat
+        except ImportError:
+            raise ImportError(
+                "The `ollama` library must be installed to use `OllamaInference`. To"
+                "install it, run the following command: `pip install ollama`"
+            )
+
+    def _get_completion(self, model: str, prompt: str, attachments: list[Any] | None):
+        response = self.chat(
+            model=model, messages=[{"role": "user", "content": prompt}]
+        )
+        return response["message"]["content"]
