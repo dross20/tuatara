@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from abc import abstractmethod
+from collections.abc import Callable
 from typing import TYPE_CHECKING, Literal
 
 from loguru import logger
@@ -175,4 +176,54 @@ class NLISourceGroundingFilter(Filter):
             if score >= self.entailment_threshold
         ]
 
+        return filtered_pairs
+
+
+class PredicateFilter(Filter):
+    """
+    Filter for removing pairs using a custom predicate.
+
+    Example usage for filtering fine-tuning pairs by the combined length of their
+    prompt and response:
+    ```python
+    from tuatara.filtering import PredicateFilter
+
+    threshold = 100
+    length_predicate = lambda x: len(x) < threshold
+    length_filter = PredicateFilter(combined_predicate=length_predicate)
+    ```
+    """
+
+    def __init__(
+        self,
+        prompt_predicate: Callable[[str], bool] | None = None,
+        response_predicate: Callable[[str], bool] | None = None,
+        combined_predicate: Callable[[str], bool] | None = None,
+    ):
+        """
+        Args:
+            prompt_predicate: The filtering predicate applied to the prompt of each
+                              fine-tuning pair. If the predicate returns `True` if the
+                              pair should be kept, and `False` otherwise.
+            response_predicate: The filtering predicate applied to the response of each
+                                fine-tuning pair.
+            combined_predicate: The filtering predicate applied to the the combined
+                                prompt and response.
+        """
+        self.prompt_predicate = prompt_predicate
+        self.response_predicate = response_predicate
+        self.combined_predicate = combined_predicate
+
+    def _filter(self, pairs: list[FineTuningPair]) -> list[FineTuningPair]:
+        filtered_pairs = []
+        for pair in pairs:
+            if self.prompt_predicate and not self.prompt_predicate(pair.prompt):
+                continue
+            if self.response_predicate and not self.response_predicate(pair.response):
+                continue
+            if self.combined_predicate and not self.combined_predicate(
+                f"{pair.prompt} {pair.response}"
+            ):
+                continue
+            filtered_pairs.append(pair)
         return filtered_pairs
