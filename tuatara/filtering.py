@@ -4,7 +4,11 @@ from __future__ import annotations
 
 from abc import abstractmethod
 from collections.abc import Callable
-from typing import TYPE_CHECKING, Literal
+from typing import TYPE_CHECKING, Literal, Any
+import inspect
+import ast
+import textwrap
+import warnings
 
 from loguru import logger
 
@@ -214,6 +218,17 @@ class PredicateFilter(Filter):
         self.response_predicate = response_predicate
         self.combined_predicate = combined_predicate
 
+        # Find the frame in the callstack where the user defined this object
+        creation_frame = None
+
+        for frame_info in inspect.stack():
+            module = inspect.getmodule(frame_info.frame)
+            if module and not "tuatara" in module.__name__:
+                creation_frame = frame_info
+                break
+            
+        self._creation_frame_info = creation_frame
+
     def _filter(self, pairs: list[FineTuningPair]) -> list[FineTuningPair]:
         filtered_pairs = []
         for pair in pairs:
@@ -227,3 +242,144 @@ class PredicateFilter(Filter):
                 continue
             filtered_pairs.append(pair)
         return filtered_pairs
+    
+    def _capture_source(self, attr_name: str) -> str:
+        """
+        Find the definition of the lambda and return it as a string.
+
+        Args:
+            attr_name: The name of the attribute on this object for which to find the
+                       lambda.
+        Returns:
+            The definition of the lambda corresponding with `attr_name`, as a string.
+        """
+        try:
+            frame = self._creation_frame_info
+            call_site_line_no = frame.lineno
+            module = inspect.getmodule(frame.frame)
+            source = textwrap.dedent(inspect.getsource(module))
+            module_source = textwrap.dedent(source)
+            
+            tree = ast.parse(module_source)
+
+            for node in ast.walk(tree):
+                if hasattr(node, "lineno") and node.lineno == call_site_line_no:
+                    if isinstance(node, ast.Call) or (isinstance(node, ast.Assign) and isinstance(node.value, ast.Call)):
+                        call_node = node if isinstance(node, ast.Call) else node.value
+
+                        arg_node = None
+
+                        for kw in call_node.keywords:
+                            if kw.arg == attr_name:
+                                arg_node = kw.value
+                                break
+
+                        if arg_node is None:
+                            sig = inspect.signature(self.__init__)
+                            params = list(sig.parameters.keys())
+                            if attr_name in params:
+                                index = params.index(attr_name)
+                                if index < len(call_node.args):
+                                    arg_node = call_node.args[index]
+
+                        if arg_node is None:
+                            return None
+
+                        if isinstance(arg_node, ast.Lambda):
+                            return ast.unparse(arg_node)
+                        
+                        if isinstance(arg_node, ast.Name):
+                            var_name = arg_node.id
+                            return self._find_assignment(tree, var_name, call_site_line_no)
+        except Exception as e:
+            warnings.warn(e)
+            return None
+        
+    def _find_assignment(self, tree, var_name, before_lineno):
+        """
+        Find the most recent assignment of a given variable in an AST.
+
+        Args:
+            tree: The AST in which to find the assignment.
+            var_name: The name of the variable for which to find the assignment.
+            before_lineno: The line number before which the assignment must be located.
+        Returns:
+            The RHS of the most recent assignment, as a string.
+        """
+        last_val = None
+        best_lineno = -1
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Assign):
+                for target in node.targets:
+                    if isinstance(target, ast.Name) and target.id == var_name:
+                        if best_lineno < node.lineno < before_lineno:
+                            best_lineno = node.lineno
+                            last_val = ast.unparse(node.value)
+        return last_val
+
+    def _build_env(self, lambd: Callable[[str], Any]) -> dict[str, Any]:
+        """
+        Build a complete environment from the creation frame for this instance.
+
+        Args:
+            lambd: The function currently being serialized.
+        Returns:
+            A dictionary containing the full environment at the site of the lambda
+            definition, prioritizing closure variables, then local variables, and
+            finally global variables.
+        """
+        env = {}
+        frame = self._creation_frame_info.frame
+
+        closure = getattr(lambd, "__closure__", None)
+        freevars = getattr(lambd.__code__, "co_freevars", ())
+
+        if closure and freevars:
+            for name, cell in zip(freevars, closure):
+                env[name] = cell.cell_contents
+
+        for k, v in frame.f_locals.items():
+            if k not in env:
+                env[k] = v
+
+        for k, v in frame.f_globals.items():
+            if k not in env:
+                env[k] = v
+
+        return env
+
+    def _to_config(self):
+        cfg = {}
+        predicates = list(inspect.signature(self.__init__).parameters.keys())
+
+        for pred in predicates:
+            lambd = getattr(self, pred)
+            source = self._capture_source(pred)
+            if source:
+                env = self._build_env(lambd)
+                filtered_env = {
+                    k: v
+                    for k, v in env.items() if k in lambd.__code__.co_names
+                }
+
+                cfg[pred] = {
+                    "source": source,
+                    "env": filtered_env,
+                }
+
+        return cfg
+    
+    @classmethod
+    def _from_config(cls, cfg):
+        new_cfg = {}
+        predicates = list(inspect.signature(cls.__init__).parameters.keys())
+        for key, value in cfg.items():
+            if key in predicates and "source" in value:
+                source = value["source"]
+                if isinstance(source, str) and source.strip().startswith("lambda"):
+                    env = value.get("env", {})
+                    try:
+                        new_cfg[key] = eval(source, env)
+                    except Exception as e:
+                        raise ValueError(f"Failed to evaluate predicate for '{key}: {value}'") from e
+        return cls(**new_cfg)
