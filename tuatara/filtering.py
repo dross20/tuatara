@@ -2,13 +2,13 @@
 
 from __future__ import annotations
 
-from abc import abstractmethod
-from collections.abc import Callable
-from typing import TYPE_CHECKING, Literal, Any
-import inspect
 import ast
+import inspect
 import textwrap
 import warnings
+from abc import abstractmethod
+from collections.abc import Callable
+from typing import TYPE_CHECKING, Any, Literal
 
 from loguru import logger
 
@@ -223,10 +223,10 @@ class PredicateFilter(Filter):
 
         for frame_info in inspect.stack():
             module = inspect.getmodule(frame_info.frame)
-            if module and not "tuatara" in module.__name__:
+            if module and "tuatara" not in module.__name__:
                 creation_frame = frame_info
                 break
-            
+
         self._creation_frame_info = creation_frame
 
     def _filter(self, pairs: list[FineTuningPair]) -> list[FineTuningPair]:
@@ -242,7 +242,7 @@ class PredicateFilter(Filter):
                 continue
             filtered_pairs.append(pair)
         return filtered_pairs
-    
+
     def _capture_source(self, attr_name: str) -> str:
         """
         Find the definition of the lambda and return it as a string.
@@ -259,12 +259,15 @@ class PredicateFilter(Filter):
             module = inspect.getmodule(frame.frame)
             source = textwrap.dedent(inspect.getsource(module))
             module_source = textwrap.dedent(source)
-            
+
             tree = ast.parse(module_source)
 
             for node in ast.walk(tree):
                 if hasattr(node, "lineno") and node.lineno == call_site_line_no:
-                    if isinstance(node, ast.Call) or (isinstance(node, ast.Assign) and isinstance(node.value, ast.Call)):
+                    if isinstance(node, ast.Call) or (
+                        isinstance(node, ast.Assign)
+                        and isinstance(node.value, ast.Call)
+                    ):
                         call_node = node if isinstance(node, ast.Call) else node.value
 
                         arg_node = None
@@ -287,14 +290,16 @@ class PredicateFilter(Filter):
 
                         if isinstance(arg_node, ast.Lambda):
                             return ast.unparse(arg_node)
-                        
+
                         if isinstance(arg_node, ast.Name):
                             var_name = arg_node.id
-                            return self._find_assignment(tree, var_name, call_site_line_no)
+                            return self._find_assignment(
+                                tree, var_name, call_site_line_no
+                            )
         except Exception as e:
             warnings.warn(e)
             return None
-        
+
     def _find_assignment(self, tree, var_name, before_lineno):
         """
         Find the most recent assignment of a given variable in an AST.
@@ -358,8 +363,7 @@ class PredicateFilter(Filter):
             if source:
                 env = self._build_env(lambd)
                 filtered_env = {
-                    k: v
-                    for k, v in env.items() if k in lambd.__code__.co_names
+                    k: v for k, v in env.items() if k in lambd.__code__.co_names
                 }
 
                 cfg[pred] = {
@@ -368,7 +372,7 @@ class PredicateFilter(Filter):
                 }
 
         return cfg
-    
+
     @classmethod
     def _from_config(cls, cfg):
         new_cfg = {}
@@ -381,5 +385,7 @@ class PredicateFilter(Filter):
                     try:
                         new_cfg[key] = eval(source, env)
                     except Exception as e:
-                        raise ValueError(f"Failed to evaluate predicate for '{key}: {value}'") from e
+                        raise ValueError(
+                            f"Failed to evaluate predicate for '{key}: {value}'"
+                        ) from e
         return cls(**new_cfg)
