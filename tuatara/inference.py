@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import inspect
 from abc import ABC, ABCMeta, abstractmethod
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from functools import lru_cache
 from typing import TYPE_CHECKING, Any, Callable
 
@@ -140,6 +140,23 @@ class InferenceRequest:
     attachments: list[Any] | None
 
 
+@dataclass()
+class InferenceResponse:
+    """
+    Model class for inference responses.
+
+    Attributes:
+        completion: The plain text response from the inference call.
+        metadata: A `dict` containing metadata concerning the inference response.
+    """
+
+    completion: str
+    metadata: dict[str, Any] = field(default_factory=dict)
+
+    def __str__(self):
+        return self.completion
+
+
 class Inference(ABC, Serializable):
     """Abstract class that defines the interface for LLM inference backends."""
 
@@ -149,7 +166,7 @@ class Inference(ABC, Serializable):
         prompt: str | None,
         attachments: list[Any] | None = None,
         request: InferenceRequest | None = None,
-    ) -> str:
+    ) -> InferenceResponse:
         """
         Generates a textual response using an LLM.
 
@@ -160,14 +177,21 @@ class Inference(ABC, Serializable):
             request: An `InferenceRequest` object containing the request details. If
                      this argument is passed in, all other arguments will be ignored.
         """
-        return (
+        completion = (
             self._get_completion(**vars(request))
             if request is not None
             else self._get_completion(model, prompt, attachments)
         )
+        if isinstance(completion, tuple):
+            completion, metadata = completion
+        else:
+            metadata = {}
+        return InferenceResponse(completion, metadata)
 
     @abstractmethod
-    def _get_completion(self, model: str, prompt: str, attachments: list[Any] | None):
+    def _get_completion(
+        self, model: str, prompt: str, attachments: list[Any] | None
+    ) -> str | tuple[str, dict[str, Any]]:
         """
         Makes a call to the inference backend.
 
@@ -176,7 +200,8 @@ class Inference(ABC, Serializable):
             prompt: The prompt to pass to the inference API.
             attachments: The multimodal attachments to attach to the API request.
         Returns:
-            The text content of the response body.
+            The text content of the response body and optionally a `dict` containing
+            metadata.
         """
         ...
 
@@ -214,7 +239,7 @@ class OpenAIInference(Inference):
             .content[0]
             .text
         )
-        return completion
+        return completion, {}
 
 
 class HuggingFaceTransformersInference(Inference):
@@ -288,7 +313,7 @@ class HuggingFaceTransformersInference(Inference):
             )
         pipeline = self._get_pipeline(model, **self.model_kwargs)
         response = pipeline(prompt, **self.generation_kwargs)
-        return response[0]["generated_text"]
+        return response[0]["generated_text"], {}
 
 
 class OllamaInference(Inference):
@@ -312,4 +337,4 @@ class OllamaInference(Inference):
         response = self.chat(
             model=model, messages=[{"role": "user", "content": prompt}]
         )
-        return response["message"]["content"]
+        return response["message"]["content"], {}
