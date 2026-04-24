@@ -128,7 +128,7 @@ class StandardPairGenerator(PairGenerator):
             document_length=len(document),
             summaries="\n\n".join(page_summaries),
         )
-        return self.inference.generate(self.model, prompt)
+        return self.inference.generate(self.model, prompt).completion
 
     def _summarize_page(self, page: Page) -> str:
         text = page.text
@@ -136,7 +136,7 @@ class StandardPairGenerator(PairGenerator):
         prompt = template.format(
             page_text=f"{text[:2000]}{'...' if len(text) > 2000 else ''}"
         )
-        return self.inference.generate(self.model, prompt)
+        return self.inference.generate(self.model, prompt).completion
 
     def _prepare_document_metadata(self, doc: Document) -> dict[str, Any]:
         page_summaries = [self._summarize_page(page) for page in doc.pages]
@@ -177,7 +177,7 @@ class StandardPairGenerator(PairGenerator):
             chunk_text=f"{chunk_text[:3000]}{'...' if len(chunk_text) > 3000 else ''}",
         )
 
-        response = self.inference.generate(self.model, prompt)
+        response = self.inference.generate(self.model, prompt).completion
         pairs = parse_json_pairs(response)
 
         return pairs
