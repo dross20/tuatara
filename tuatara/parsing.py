@@ -1,5 +1,6 @@
 """Contains all classes related to text, table, and image parsing."""
 
+import re
 import warnings
 from abc import abstractmethod
 from pathlib import Path
@@ -14,6 +15,7 @@ class AutoParser(PipelineStep):
     """Filetype-agnostic document parser."""
 
     _registry = {}
+    _registry_re = {}
 
     @classmethod
     def register_parser(cls, extension: str):
@@ -28,6 +30,23 @@ class AutoParser(PipelineStep):
 
         def decorator(target):
             cls._registry[extension] = target
+            return target
+
+        return decorator
+
+    @classmethod
+    def register_parser_re(cls, pattern: str):
+        """
+        Register a new parser in `AutoParser`'s registry. `Parser` child classes
+        registered with this method will be used when `AutoParser` processes files
+        whose paths match the given regular expression.
+
+        Args:
+            pattern: The regular expression against which paths will be matched.
+        """
+
+        def decorator(target):
+            cls._registry_re[re.compile(pattern)] = target
             return target
 
         return decorator
@@ -48,16 +67,24 @@ class AutoParser(PipelineStep):
         out_docs = []
 
         for doc in docs:
-            parser = self._registry.get(doc.filetype)
+            matched = False
+            for pattern, parser in self._registry_re.items():
+                if pattern.match(str(doc.path)):
+                    out_docs.extend(parser().forward(doc))
+                    matched = True
+                    break
 
-            if parser is None:
-                supported_filetypes = ", ".join(self._registry.keys())
-                warnings.warn(
-                    f"Parsing is not supported for file type '{doc.filetype}'. "
-                    f"Supported file types: {supported_filetypes}"
-                )
-            else:
-                out_docs.extend(parser().forward(doc))
+            if not matched:
+                parser = self._registry.get(doc.filetype)
+
+                if parser is None:
+                    supported_filetypes = ", ".join(self._registry.keys())
+                    warnings.warn(
+                        f"Parsing is not supported for file type '{doc.filetype}'. "
+                        f"Supported file types: {supported_filetypes}"
+                    )
+                else:
+                    out_docs.extend(parser().forward(doc))
         return out_docs
 
 
@@ -124,3 +151,40 @@ class PDFParser(Parser):
         with self.pdfplumber.open(path) as pdf:
             pages = [page.extract_text() for page in pdf.pages]
         return pages
+
+
+@AutoParser.register_parser_re(r"https?://\S+")
+class WebScrapingParser(Parser):
+    """
+    Parser for web URLs. Use the `requests` and `BeautifulSoup` libraries to scrape
+    webpages. By default, webpages are split on "h1" tags.
+    """
+
+    def __init__(self, delimiter: str = "h1"):
+        import requests
+        from bs4 import BeautifulSoup
+
+        self.requests = requests
+        self.BeautifulSoup = BeautifulSoup
+
+        self.delimiter = delimiter
+
+    def parse(self, path: Path) -> list[str]:
+        response = self.requests.get(
+            path.as_posix().replace("/", "//", 1), headers={"User-Agent": "Mozilla/5.0"}
+        )
+        response.raise_for_status()
+        soup = self.BeautifulSoup(response.text, "html.parser")
+
+        pages = []
+        sections = soup.find_all(self.delimiter)
+        for i, section in enumerate(sections):
+            end = sections[i + 1] if i + 1 < len(sections) else None
+            text = [section.get_text()]
+            for tag in section.find_all_next("p"):
+                if tag == end:
+                    break
+                text.append(tag.get_text())
+            pages.append("\n".join(text))
+
+        return pages if pages else [soup.get_text()]
