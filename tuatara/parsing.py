@@ -160,25 +160,31 @@ class WebScrapingParser(Parser):
     webpages. By default, webpages are split on "h1" tags.
     """
 
-    def __init__(self):
+    def __init__(self, delimiter: str = "h1"):
         import requests
         from bs4 import BeautifulSoup
 
         self.requests = requests
         self.BeautifulSoup = BeautifulSoup
 
-    def parse(self, path: Path, delimiter: str = "h1") -> list[str]:
-        response = self.requests.get(str(path))
+        self.delimiter = delimiter
+
+    def parse(self, path: Path) -> list[str]:
+        response = self.requests.get(
+            path.as_posix().replace("/", "//", 1), headers={"User-Agent": "Mozilla/5.0"}
+        )
         response.raise_for_status()
         soup = self.BeautifulSoup(response.text, "html.parser")
 
         pages = []
-        for section in soup.find_all(delimiter):
-            text = []
-            for sibling in section.find_next_siblings():
-                if sibling.name == delimiter:
+        sections = soup.find_all(self.delimiter)
+        for i, section in enumerate(sections):
+            end = sections[i + 1] if i + 1 < len(sections) else None
+            text = [section.get_text()]
+            for tag in section.find_all_next("p"):
+                if tag == end:
                     break
-                text.append(sibling.get_text())
-            pages.append(section.get_text() + "\n" + "\n".join(text))
+                text.append(tag.get_text())
+            pages.append("\n".join(text))
 
         return pages if pages else [soup.get_text()]
