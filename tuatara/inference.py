@@ -233,13 +233,16 @@ class OpenAIInference(Inference):
     def _get_completion(
         self, model: str, prompt: str, attachments: list[Any] | None
     ) -> str:
-        completion = (
-            self.client.responses.create(model=model, input=prompt)
+        output = (
+            self.client.responses.create(
+                model=model, input=prompt, logprobs=True, top_logprobs=1
+            )
             .output[0]
             .content[0]
-            .text
         )
-        return completion, {}
+        completion = output.text
+        logprobs = output.logprobs
+        return completion, {"logprobs": logprobs}
 
 
 class HuggingFaceTransformersInference(Inference):
@@ -254,9 +257,11 @@ class HuggingFaceTransformersInference(Inference):
         generation_kwargs: dict[str, Any] | None = None,
     ):
         try:
+            import torch
             from transformers import pipeline
 
             self.pipeline = pipeline
+            self.torch = torch
         except ImportError:
             raise ImportError(
                 "The `transformers` library must be installed to use "
@@ -312,8 +317,29 @@ class HuggingFaceTransformersInference(Inference):
                 "`HuggingFaceTransformersInference` inference backend."
             )
         pipeline = self._get_pipeline(model, **self.model_kwargs)
-        response = pipeline(prompt, **self.generation_kwargs)
-        return response[0]["generated_text"], {}
+
+        tokenizer = pipeline.tokenizer
+        lm = pipeline.model
+
+        inputs = tokenizer(prompt, return_tensors="pt").to(lm.device)
+
+        with self.torch.no_grad():
+            outputs = lm.generate(
+                **inputs,
+                return_dict_in_generate=True,
+                output_scores=True,
+                **self.generation_kwargs,
+            )
+
+        generated_ids = outputs.sequences[0][inputs["input_ids"].shape[1] :]
+        generated_text = tokenizer.decode(generated_ids, skip_special_tokens=True)
+
+        logprobs = [
+            self.torch.log_softmax(score, dim=-1).max().item()
+            for score in outputs.scores
+        ]
+
+        return generated_text, {"logprobs": logprobs}
 
 
 class OllamaInference(Inference):
@@ -335,6 +361,8 @@ class OllamaInference(Inference):
 
     def _get_completion(self, model: str, prompt: str, attachments: list[Any] | None):
         response = self.chat(
-            model=model, messages=[{"role": "user", "content": prompt}]
+            model=model,
+            messages=[{"role": "user", "content": prompt}],
+            options={"logprobs": True, "top_logprobs": 1},
         )
-        return response["message"]["content"], {}
+        return response["message"]["content"], {"logprobs": response.get("logprobs")}
